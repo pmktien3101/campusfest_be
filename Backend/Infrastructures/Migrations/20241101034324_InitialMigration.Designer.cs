@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Backend.Infrastructures.Migrations
 {
     [DbContext(typeof(CampusFestDbContext))]
-    [Migration("20241030190407_UpdateInitialData")]
-    partial class UpdateInitialData
+    [Migration("20241101034324_InitialMigration")]
+    partial class InitialMigration
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -28,21 +28,6 @@ namespace Backend.Infrastructures.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("AccountRole", b =>
-                {
-                    b.Property<Guid>("AccountsId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("RolesId")
-                        .HasColumnType("int");
-
-                    b.HasKey("AccountsId", "RolesId");
-
-                    b.HasIndex("RolesId");
-
-                    b.ToTable("AccountRole");
-                });
-
             modelBuilder.Entity("Backend.Cores.Entities.Account", b =>
                 {
                     b.Property<Guid>("Id")
@@ -55,6 +40,9 @@ namespace Backend.Infrastructures.Migrations
 
                     b.Property<int?>("CampusId")
                         .HasColumnType("int");
+
+                    b.Property<Guid?>("ClubId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("CreatedTime")
                         .HasColumnType("datetime2");
@@ -84,6 +72,9 @@ namespace Backend.Infrastructures.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int>("RoleId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Username")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -92,7 +83,28 @@ namespace Backend.Infrastructures.Migrations
 
                     b.HasIndex("CampusId");
 
+                    b.HasIndex("ClubId");
+
+                    b.HasIndex("RoleId");
+
                     b.ToTable("Accounts");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("4cf5c11b-8f8a-4959-ad93-d5558fb1b6e7"),
+                            Avatar = "",
+                            CreatedTime = new DateTime(2024, 11, 1, 10, 43, 22, 584, DateTimeKind.Local).AddTicks(8858),
+                            Email = "[Your email goes here]",
+                            Fullname = "Collin",
+                            IsDeleted = false,
+                            IsVerified = true,
+                            LastUpdatedTime = new DateTime(2024, 11, 1, 3, 43, 22, 584, DateTimeKind.Utc).AddTicks(8880),
+                            Password = "BCE37EEE9DFA8D910FA103096F49A341B741FA698BF07E6771C1BF9653B38A80370465623389C702CBC686C760C7D377A394299AA39C2EFCFEFE25A58DFE3400948DEC030F350DA467E5DC0A690183F326980470AB1E560CB35784F51BCB2007AE9CE57BFB55D5C58E3DC3D0F134BE3AD114DEA64BA57C2938391AC8AC17E22C746397DF1F2EA0498FCB0B3FA4AFFB04C4157EF371DCD01D34CA8725DF295DEA3AB0F91AA83C63A7327394E013F795796AE54ABBB88280848C4C18CA86A0350CC65D2B0427678268C36BBBE07E4B0539C4DF98BC79B14CC21022F5BC36CFB4D1B135E3F9D14741850696B0193347936D56A135559AD1C989DFBAB39F71A9B451",
+                            Phone = "",
+                            RoleId = 1,
+                            Username = "SystemAdmin"
+                        });
                 });
 
             modelBuilder.Entity("Backend.Cores.Entities.Campus", b =>
@@ -180,9 +192,6 @@ namespace Backend.Infrastructures.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
-                    b.Property<Guid>("ManagerId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -191,40 +200,13 @@ namespace Backend.Infrastructures.Migrations
 
                     b.HasIndex("CampusId");
 
-                    b.HasIndex("ManagerId");
-
                     b.ToTable("Clubs");
-                });
-
-            modelBuilder.Entity("Backend.Cores.Entities.ClubEventStaff", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("AccountId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("ClubId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AccountId")
-                        .IsUnique();
-
-                    b.HasIndex("ClubId");
-
-                    b.ToTable("ClubEventStaffs");
                 });
 
             modelBuilder.Entity("Backend.Cores.Entities.Event", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid?>("AccountId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<int>("Capacity")
@@ -255,8 +237,6 @@ namespace Backend.Infrastructures.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("AccountId");
 
                     b.HasIndex("club");
 
@@ -379,26 +359,27 @@ namespace Backend.Infrastructures.Migrations
                     b.ToTable("Tokens");
                 });
 
-            modelBuilder.Entity("AccountRole", b =>
-                {
-                    b.HasOne("Backend.Cores.Entities.Account", null)
-                        .WithMany()
-                        .HasForeignKey("AccountsId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Backend.Cores.Entities.Role", null)
-                        .WithMany()
-                        .HasForeignKey("RolesId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("Backend.Cores.Entities.Account", b =>
                 {
-                    b.HasOne("Backend.Cores.Entities.Campus", null)
+                    b.HasOne("Backend.Cores.Entities.Campus", "Campus")
                         .WithMany("Accounts")
                         .HasForeignKey("CampusId");
+
+                    b.HasOne("Backend.Cores.Entities.Club", "Club")
+                        .WithMany("Staffs")
+                        .HasForeignKey("ClubId");
+
+                    b.HasOne("Backend.Cores.Entities.Role", "Role")
+                        .WithMany("Accounts")
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Campus");
+
+                    b.Navigation("Club");
+
+                    b.Navigation("Role");
                 });
 
             modelBuilder.Entity("Backend.Cores.Entities.Club", b =>
@@ -409,42 +390,11 @@ namespace Backend.Infrastructures.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Backend.Cores.Entities.Account", "Manager")
-                        .WithMany()
-                        .HasForeignKey("ManagerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.Navigation("Campus");
-
-                    b.Navigation("Manager");
-                });
-
-            modelBuilder.Entity("Backend.Cores.Entities.ClubEventStaff", b =>
-                {
-                    b.HasOne("Backend.Cores.Entities.Account", "Account")
-                        .WithOne("ClubStaff")
-                        .HasForeignKey("Backend.Cores.Entities.ClubEventStaff", "AccountId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Backend.Cores.Entities.Club", "Club")
-                        .WithMany("Staffs")
-                        .HasForeignKey("ClubId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Account");
-
-                    b.Navigation("Club");
                 });
 
             modelBuilder.Entity("Backend.Cores.Entities.Event", b =>
                 {
-                    b.HasOne("Backend.Cores.Entities.Account", null)
-                        .WithMany("EventStaff")
-                        .HasForeignKey("AccountId");
-
                     b.HasOne("Backend.Cores.Entities.Club", "Club")
                         .WithMany("Events")
                         .HasForeignKey("club")
@@ -484,14 +434,6 @@ namespace Backend.Infrastructures.Migrations
                     b.Navigation("Account");
                 });
 
-            modelBuilder.Entity("Backend.Cores.Entities.Account", b =>
-                {
-                    b.Navigation("ClubStaff")
-                        .IsRequired();
-
-                    b.Navigation("EventStaff");
-                });
-
             modelBuilder.Entity("Backend.Cores.Entities.Campus", b =>
                 {
                     b.Navigation("Accounts");
@@ -509,6 +451,11 @@ namespace Backend.Infrastructures.Migrations
             modelBuilder.Entity("Backend.Cores.Entities.Event", b =>
                 {
                     b.Navigation("EventRegistrations");
+                });
+
+            modelBuilder.Entity("Backend.Cores.Entities.Role", b =>
+                {
+                    b.Navigation("Accounts");
                 });
 #pragma warning restore 612, 618
         }
