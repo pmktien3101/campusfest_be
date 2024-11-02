@@ -373,6 +373,7 @@ namespace Backend.API.Services.Implementation
             // Data validation for account property update
             if (!ValidationHelper.ValidateString(email, @"^[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$"))
             {
+                 
                 ExceptionGenerator.GenericServiceException<BaseServiceException>(
                   message: "Email is not valid",
                   error: "Account_Update_Exception",
