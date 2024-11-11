@@ -32,91 +32,17 @@ namespace Backend.API.Services.Implementation
 
         public async Task AddAccount(AccountDTO accountInfo)
         {
-            // Data validation for account creation
-
-            // Check for existing username inside the database.
-            if (await accountRepo.IsExist("Username", accountInfo.Username))
-            {
-                ExceptionGenerator.GenericServiceException<BaseServiceException>(
-                    message: "Username has been taken",
-                    error: "Account_Creation_Exception",
-                    type: "Invalid",
-                    summary: "Username has been taken",
-                    detail: "There is another account has been created with this username, please try another one.",
-                    value: accountInfo.Username);
-            }
-
-            // Checking for any existing active account with the same email address.
-            if (await accountRepo.FindFirstMatch(x => x.Email == accountInfo.Email && !x.IsDeleted) != null)
-            {
-                ExceptionGenerator.GenericServiceException<BaseServiceException>(
-                    message: "Email address is invalid",
-                    error: "Account_Creation_Exception",
-                    type: "Invalid",
-                    summary: "Email address is invalid",
-                    detail: "The email address has already been taken.",
-                    value: accountInfo.Email);
-            }
-            
-            // Checking for a valid email address.
-            if (!ValidationHelper.ValidateString(accountInfo.Email, @"(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|""(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*"")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\.){3}(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])"))
-            {
-                ExceptionGenerator.GenericServiceException<BaseServiceException>(
-                    message: "Email address is invalid", 
-                    error:"Account_Creation_Exception", 
-                    type: "Invalid",
-                    summary:"Email address is invalid",
-                    detail:"The email address does not valid. Please retry with another email (Ex: exapmle@gmail.com)",
-                    value: accountInfo.Email);
-            }
-
-            if (!ValidationHelper.ValidateString(accountInfo.Phone, @"^[\d]{9,11}$"))
-            {
-                ExceptionGenerator.GenericServiceException<BaseServiceException>(
-                   message: "Phone number is invalid",
-                   error: "Account_Creation_Exception",
-                   type: "Invalid",
-                   summary: "Phone number is invalid",
-                   detail: "The phone number should be 9 to 11 digit in length.",
-                   value: accountInfo.Email);
-            }
-
-            // Checking for a valid password.
-            if (!ValidationHelper.ValidateString(accountInfo.Password, @"^(?=.*[A-Za-z])(?=.*\d)[\d\w!@#$%^&*_]{8,30}$"))
-            {
-                ExceptionGenerator.GenericServiceException<BaseServiceException>(
-                    message: "Password is invalid",
-                    error: "Account_Creation_Exception",
-                    type: "Invalid",
-                    summary: "Password is invalid",
-                    detail: @"The password should at least 8 character in length with at least one numeric digit, you also can use special characters such as '!@#$%^&*_' while creating password.",
-                    value: accountInfo.Password);
-            }
-            
             var entity = mapper.Map<Account>(accountInfo);
-
-            // Checking for valid role.
-            
-            var roleEntity = (await roleRepo.FindFirstMatch(x => x.Name == accountInfo.Role));
-
-            if (roleEntity == null)
-            {
-                ExceptionGenerator.GenericServiceException<BaseServiceException>(
-                    message: "User role is invalid",
-                    error: "Account_Creation_Exception",
-                    type: "Invalid",
-                    summary: "Role data not found",
-                    detail: @"There is no role data found for the provided role name",
-                    value: accountInfo.Role);
-
-                return;
-            }
 
             entity.CreatedTime = DateTime.UtcNow;
             entity.LastUpdatedTime = DateTime.UtcNow;
+
+            // Adding role
+            Role roleEntity = (await roleRepo.FindFirstMatch(x => x.Name == accountInfo.Role))!;
+
             entity.RoleId = roleEntity.Id;
             entity.Role = roleEntity;
-            
+
             // Create a hashed password.
             entity.Password = HashPassword(entity.Password); //  Create pasword hash using SHA256 hashing alogrithm
 
@@ -131,11 +57,11 @@ namespace Backend.API.Services.Implementation
             if (entity == null)
             {
                 ExceptionGenerator.GenericServiceException<BaseServiceException>(
-                    "Account information not found", 
-                    "Account_Exception", 
-                    "notFound", 
-                    "Account information not found", 
-                    "Account information not found for given Id", 
+                    "Account information not found",
+                    "Account_Exception",
+                    "notFound",
+                    "Account information not found",
+                    "Account information not found for given Id",
                     accountId);
 
                 return null!;
@@ -149,8 +75,6 @@ namespace Backend.API.Services.Implementation
             Expression<Func<Account, bool>> predicate = x => (x.Username == username || x.Email == username) && x.Password == HashPassword(password);
 
             var entity = await accountRepo.FindFirstMatch(predicate, x => x.Role);
-            
-            Console.WriteLine(entity != null);
 
             if (entity == null)
             {
@@ -165,6 +89,13 @@ namespace Backend.API.Services.Implementation
             }
 
             return mapper.Map<Account, AccountDTO>(entity);
+        }
+
+        public async Task<IEnumerable<AccountDTO>> GetAccountPaginated(int page, int page_size, List<string> includes, Expression<Func<Account, bool>> predicate)
+        {
+            var result = await accountRepo.GetPaginated(page, page_size, includes, predicate, null!);
+
+            return mapper.Map<IEnumerable<AccountDTO>>(result);
         }
 
         public async Task<IEnumerable<AccountDTO>> GetAccountPaginated(int page, int page_size, string username = "", string fullname = "", string email = "", string phone = "", string sortby = "", bool IncludeDeleted = false, bool OnlyVerified = false, bool isDecending = false)
@@ -191,15 +122,9 @@ namespace Backend.API.Services.Implementation
                     break;
                 default:
                     break;
-            }    
+            }
 
             var result = await accountRepo.GetPaginated(page, page_size, includeProperty, filterExpression, sortByExpression, false, isDecending);
-
-            Console.WriteLine(username);
-            foreach (var s in result)
-            {
-                Console.WriteLine(s.Username.Contains(username));
-            }
 
             return mapper.Map<IEnumerable<Account>, IEnumerable<AccountDTO>>(result);
         }
@@ -307,11 +232,11 @@ namespace Backend.API.Services.Implementation
 
             await accountRepo.Update(target);
         }
-        
+
         public async Task UpdatePassword(Guid accountId, string password)
         {
             var target = await accountRepo.GetById(accountId);
-            
+
             if (target == null)
             {
                 ExceptionGenerator.GenericServiceException<BaseServiceException>(
@@ -361,19 +286,18 @@ namespace Backend.API.Services.Implementation
             if (accountRepo.FindFirstMatch(x => x.Id != accountId && x.Email.ToLower() == email.ToLower() && !x.IsDeleted) != null)
             {
                 ExceptionGenerator.GenericServiceException<BaseServiceException>(
-                                  message: "Email hase been taken by another account",
-                                  error: "Account_Update_Exception",
-                                  type: "Invalid",
-                                  summary: "The email address is not available to create account.",
-                                  detail: @"The given email address has been used to create an existing account in the system.",
-                                  value: email);
+                    message: "Email hase been taken by another account",
+                    error: "Account_Update_Exception",
+                    type: "Invalid",
+                    summary: "The email address is not available to create account.",
+                    detail: @"The given email address has been used to create an existing account in the system.",
+                    value: email);
                 return;
             }
 
             // Data validation for account property update
             if (!ValidationHelper.ValidateString(email, @"^[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$"))
             {
-                 
                 ExceptionGenerator.GenericServiceException<BaseServiceException>(
                   message: "Email is not valid",
                   error: "Account_Update_Exception",
@@ -430,7 +354,7 @@ namespace Backend.API.Services.Implementation
             await accountRepo.Update(target);
         }
 
-        private byte[] GenerateSalt(int length) 
+        private byte[] GenerateSalt(int length)
         {
             return RandomNumberGenerator.GetBytes(length);
         }
@@ -438,7 +362,7 @@ namespace Backend.API.Services.Implementation
         private string HashPassword(string password, byte[] salt)
         {
             byte[] HashedPassword = Rfc2898DeriveBytes.Pbkdf2(password, salt, 3000, HashAlgorithmName.SHA256, 256);
-            
+
             return Convert.ToHexString(HashedPassword);
         }
 
@@ -465,7 +389,7 @@ namespace Backend.API.Services.Implementation
                 return null!;
             }
 
-            return mapper.Map<Role,RoleDTO>(result);
+            return mapper.Map<Role, RoleDTO>(result);
         }
 
         public async Task<IEnumerable<RoleDTO>> GetRoles()
@@ -512,6 +436,84 @@ namespace Backend.API.Services.Implementation
                    value: roleId);
             return null!;
         }
+
+        public async Task<bool> ValidateAccountRegisterInformation(AccountDTO account)
+        {
+            // Check for existing username inside the database.
+            if (await accountRepo.IsExist("Username", account.Username))
+            {
+                ExceptionGenerator.GenericServiceException<BaseServiceException>(
+                    message: "Username has been taken",
+                    error: "Account_Creation_Exception",
+                    type: "Invalid",
+                    summary: "Username has been taken",
+                    detail: "There is another account has been created with this username, please try another one.",
+                    value: account.Username);
+            }
+
+            // Checking for any existing active account with the same email address.
+            if (await accountRepo.FindFirstMatch(x => x.Email == account.Email && !x.IsDeleted) != null)
+            {
+                ExceptionGenerator.GenericServiceException<BaseServiceException>(
+                    message: "Email address is invalid",
+                    error: "Account_Creation_Exception",
+                    type: "Invalid",
+                    summary: "Email address is invalid",
+                    detail: "The email address has already been taken.",
+                    value: account.Email);
+            }
+
+            // Checking for a valid email address.
+            if (!ValidationHelper.ValidateEmail(account.Email))
+            {
+                ExceptionGenerator.GenericServiceException<BaseServiceException>(
+                    message: "Email address is invalid",
+                    error: "Account_Creation_Exception",
+                    type: "Invalid",
+                    summary: "Email address is invalid",
+                    detail: "The email address does not valid. Please retry with another email (Ex: exapmle@gmail.com)",
+                    value: account.Phone);
+            }
+
+            if (!ValidationHelper.ValidatePhoneNumber(account.Phone))
+            {
+                ExceptionGenerator.GenericServiceException<BaseServiceException>(
+                   message: "Phone number is invalid",
+                   error: "Account_Creation_Exception",
+                   type: "Invalid",
+                   summary: "Phone number is invalid",
+                   detail: "The phone number should be 9 to 11 digit in length.",
+                   value: account.Phone);
+            }
+
+            // Checking for a valid password.
+            if (!ValidationHelper.ValidatePassword(account.Password))
+            {
+                ExceptionGenerator.GenericServiceException<BaseServiceException>(
+                    message: "Password is invalid",
+                    error: "Account_Creation_Exception",
+                    type: "Invalid",
+                    summary: "Password is invalid",
+                    detail: @"The password should at least 8 character in length with at least one numeric digit, you also can use special characters such as '!@#$%^&*_' while creating password.",
+                    value: account.Password);
+            }
+            // Checking for valid role.
+            var roleEntity = (await roleRepo.FindFirstMatch(x => x.Name == account.Role));
+
+            if (roleEntity == null)
+            {
+                ExceptionGenerator.GenericServiceException<BaseServiceException>(
+                    message: "Password is invalid",
+                    error: "Account_Creation_Exception",
+                    type: "Invalid",
+                    summary: "Role not found",
+                    detail: @"Account role does not match with any existing role in the system",
+                    value: account.Role);
+            }
+
+            return true;
+        }
+
         protected virtual void Dispose(bool disposing)
         {
             if (!disposedValue)
